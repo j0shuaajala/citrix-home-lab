@@ -455,4 +455,82 @@ This lab is deliberately built on-premises on Hyper-V. The value of the design i
 
 **Scope note**
 
-This section is a design mapping, not a deployed build. The lab validates the identity and access design hands-on; an Azure deployment of the same design is a candidate future phase.
+This section maps the design, not a deployed build. The lab validates the identity and access design hands-on; an Azure deployment of the same design is a candidate future phase.
+---
+
+## 13. Phase 6b–6e: SQL, SSMS, Workspace App and CTX01 Pre-flight
+
+### Phase 6b: SQL Server 2025 Developer Edition (CTX01)
+
+SQL Server 2025 Standard Developer Edition installed on CTX01 to provide the
+Site database required by the Citrix Delivery Controller. Developer edition
+chosen over Express — no database size limit and full SQL engine feature set,
+free for non-production use.
+
+| Attribute | Value |
+|---|---|
+| Edition | SQL Server 2025 Standard Developer |
+| Version | 17.0.1000.7 RTM |
+| Instance name | MSSQLSERVER (default instance) |
+| SQL administrator | LAB\Administrator |
+| Install path | C:\Program Files\Microsoft SQL Server |
+
+```powershell
+Start-Service -Name 'MSSQLSERVER'
+Set-Service -Name 'MSSQLSERVER' -StartupType Automatic
+Get-Service -Name 'MSSQLSERVER'
+```
+
+**Citrix wizard database server value:** `CTX01`
+
+**Verified:** `Get-Service -Name 'MSSQLSERVER'` returns Status: Running.
+
+---
+
+### Phase 6c: SQL Server Management Studio 22 (CTX01)
+
+SSMS 22.10.1 installed on CTX01 to verify Citrix site databases post-build.
+No optional workloads selected during installation.
+
+**Verified:** SSMS opens and connects to CTX01 using Windows Authentication.
+
+---
+
+### Phase 6d: Citrix Workspace App (Host laptop)
+
+Citrix Workspace App 26.3.10.69 x64 installed on host laptop — the client
+used in Phase 10 to connect to StoreFront and launch the virtual desktop.
+
+| Attribute | Value |
+|---|---|
+| Version | 26.3.10.69 |
+| Platform | Windows x64 |
+| Installed on | LAB-HOST01 (host laptop) |
+
+---
+
+### Phase 6e: CTX01 Pre-flight Preparation
+
+CTX01 is fully prepared for the Citrix CVAD installer:
+
+```powershell
+# .NET Framework 3.5 (required by Citrix installer)
+Install-WindowsFeature Net-Framework-Core
+
+# Disable Windows Firewall (lab only)
+Set-NetFirewallProfile -Profile Domain, Public, Private -Enabled False
+
+# Disable IE Enhanced Security
+$AdminKey = "HKLM:\SOFTWARE\Microsoft\Active Setup\Installed Components\{A509B1A7-37EF-4b3f-8CFC-4F3A74704073}"
+Set-ItemProperty -Path $AdminKey -Name "IsInstalled" -Value 0
+```
+
+### Checkpoints (Host)
+
+```powershell
+Checkpoint-VM -Name CTX01 -SnapshotName "SQL Server 2025 and SSMS 22 installed"
+Checkpoint-VM -Name DC01 -SnapshotName "Foundation complete"
+Checkpoint-VM -Name WIN11-VDA -SnapshotName "Foundation complete"
+```
+
+**Verified:** All three VMs were checkpointed successfully.
