@@ -1,536 +1,341 @@
-# Citrix Virtual Apps & Desktops Home Lab: Architecture and Build Guide
+# Citrix Virtual Apps & Desktops (CVAD) Home Lab: Architecture and Build Guide
 
-![Status](https://img.shields.io/badge/Status-Phase%201%20complete-1F3A5F?style=flat-square) ![Platform](https://img.shields.io/badge/Platform-Hyper--V-2F6690?style=flat-square) ![Citrix](https://img.shields.io/badge/Citrix-CVAD%20LTSR-3A7CA5?style=flat-square) ![Framework](https://img.shields.io/badge/Mapped%20to-ISO%2027001%20%7C%20ISO%2042001-6B7B8C?style=flat-square)
-
-**Author:** Olufemi Joshua Ajala · Cybersecurity & AI Governance · September 2026
-
-**Contents:** [Executive summary](#1-executive-summary) · [Objectives and scope](#2-objectives-and-scope) · [Architecture](#3-solution-architecture) · [Design decisions](#4-key-design-decisions) · [Specification](#5-environment-specification) · [Build](#6-build-implementation) · [Issues](#7-issues-encountered-and-resolutions) · [Security](#8-security-and-governance-considerations) · [Roadmap](#9-current-status-and-roadmap) · [Skills](#10-skills-demonstrated-and-lessons-learned) · [Governance framing](#11-security-and-ai-governance-framing) · [Azure path](#12-cloud-migration-path-microsoft-azure)
+> **A hands-on Citrix CVAD 7 2203 LTSR home lab built on Hyper-V — documenting every phase from bare-metal setup to security policy enforcement, compliance alignment, and a cloud migration design mapping the full deployment to Microsoft Azure Virtual Desktop.**
 
 ---
 
-## 1. Executive summary
+## 🏗️ Lab Architecture
 
-> **Status:** Phase 1 (enterprise foundation) complete. Citrix installation phases 7 to 10 are pending access to installation media.
+| Component | VM Name | IP Address | Role |
+|---|---|---|---|
+| Domain Controller | DC01 | 192.168.100.10 | Active Directory, DNS, DHCP |
+| Citrix Delivery Controller | CTX01 | 192.168.100.20 | Delivery Controller, StoreFront, Director, Studio |
+| Virtual Desktop Agent | WIN11-VDA | 192.168.100.100 | Windows 11 VDA (end-user desktop) |
+| Host Machine | — | 192.168.100.1 | Hyper-V hypervisor (laptop) |
 
-A three-tier, enterprise-style Citrix Virtual Apps and Desktops (CVAD) lab foundation is built and operational on a single laptop, ready for the Citrix software install.
-
-The lab replicates the core of a corporate virtual desktop estate: an Active Directory domain (`lab.local`), a dedicated Citrix infrastructure server, and a Windows 11 virtual desktop. All three virtual machines run on Microsoft Hyper-V on an isolated NAT network, with DNS, DHCP and internet access provided centrally.
-
-| Area | Status |
-| --- | --- |
-| Host platform and virtual network | Complete |
-| Identity tier (DC01: AD DS, DNS, DHCP) | Complete |
-| Citrix infrastructure server (CTX01) | Built and domain-joined; Citrix software pending |
-| Virtual desktop (WIN11-VDA) | Built and domain-joined; VDA pending |
-| Directory design (OUs, users, groups) | Complete |
-
-The one open dependency is download access to the Citrix installation media, which requires an account set up through Citrix sales or a Citrix partner.
+**Domain:** `lab.local` | **NetBIOS:** `LAB`
 
 ---
 
-## 2. Objectives and scope
+## 🎯 Project Objectives
 
-The goal is a repeatable, self-contained environment for hands-on Citrix training that mirrors how enterprises structure their virtual desktop infrastructure.
+This home lab replicates the architecture and decision-making of a real enterprise Citrix CVAD deployment — built from scratch on a single laptop using Hyper-V. It covers the full stack: identity, virtualisation, session delivery, security policy, monitoring, and a cloud migration design.
 
-**Objectives**
+**Business value this lab demonstrates:**
+Organisations running Citrix on-premises face rising infrastructure costs, compliance pressure, and a new challenge: governing employee access to AI tools. This lab shows how Citrix CVAD — and its Azure equivalent, AVD — solves all three: reducing endpoint sprawl, enforcing data controls aligned to ISO 27001, and providing a secure boundary for AI tool delivery auditable under ISO 42001. The same architecture pattern is used by financial services firms, law firms, and NHS trusts to protect sensitive data while enabling flexible working.
 
-- Build a working Citrix delivery path end to end: identity, brokering, and a virtual desktop.
-- Follow enterprise conventions for naming, IP addressing, OU design and group-based access.
-- Script post-install configuration in PowerShell so each step is documented and repeatable.
-- Keep the lab isolated from the home network while still giving it internet access.
-
-**In scope**
-
-- Hyper-V host configuration and an isolated NAT virtual network.
-- One domain controller providing AD DS, DNS and DHCP.
-- One Citrix infrastructure server and one Windows 11 desktop VM.
-- Active Directory OUs, test users and a Citrix access group.
-
-**Out of scope for this phase**
-
-- High availability (a second controller, SQL clustering, load-balanced StoreFront).
-- External access through Citrix NetScaler Gateway.
-- Provisioning technologies such as MCS or PVS image management.
-
-**Constraints**
-
-- A single laptop host, so there is no hardware redundancy.
-- Evaluation licensing: Windows Server for 180 days, Windows 11 Enterprise for 90 days, and Citrix trial mode for 30 days and 10 connections.
+**Scope covered:**
+- Secure virtual desktop delivery with Active Directory authentication and session management
+- Data Loss Prevention (DLP) policy enforcement at the Citrix policy layer
+- Centralised monitoring and helpdesk capability via Citrix Director
+- Compliance alignment with **ISO 27001 Control 8.12** (Data Leakage Prevention)
+- AI tool governance design aligned to **ISO 42001**
+- Cloud migration design: mapping every on-prem component to its **Microsoft Azure** equivalent
 
 ---
 
-## 3. Solution architecture
+## ☁️ Azure Migration Design
 
-All three VMs sit on one internal Hyper-V switch, with the host acting as the NAT gateway and DC01 as the single source of identity, name resolution and addressing.
+> **Note:** This section is a migration design and architecture mapping — not a deployed Azure environment. It demonstrates how the on-premises Citrix lab maps to Azure equivalents and the design decisions an architect would make during that migration. Hands-on AVD deployment is a planned next phase.
 
-```mermaid
-flowchart TB
-    Internet((Internet)) --- Host
-    subgraph Host["Host: HP EliteBook 840 G11 · Windows 11 Pro · Hyper-V"]
-        NAT["LabNAT switch + NAT gateway<br/>192.168.100.1/24"]
-        subgraph Identity["Identity tier"]
-            DC01["DC01 · 192.168.100.10<br/>AD DS · DNS · DHCP"]
-        end
-        subgraph Control["Citrix control tier"]
-            CTX01["CTX01 · 192.168.100.20<br/>Delivery Controller · StoreFront<br/>Studio · License Server (pending)"]
-        end
-        subgraph Resource["Resource tier"]
-            VDA["WIN11-VDA · DHCP 192.168.100.100<br/>Windows 11 Enterprise · VDA (pending)"]
-        end
-    end
-    NAT --- DC01
-    NAT --- CTX01
-    NAT --- VDA
-    CTX01 -. "AD auth + DNS" .-> DC01
-    VDA -. "DHCP lease + AD auth" .-> DC01
-    VDA -. "VDA registration (planned)" .-> CTX01
+The table below maps every on-premises Citrix component to its Azure equivalent — the path an enterprise would take to lift this deployment into Azure.
 
-    classDef ident fill:#1F3A5F,stroke:#0F2238,color:#FFFFFF,stroke-width:1px
-    classDef ctrl fill:#2F6690,stroke:#1F3A5F,color:#FFFFFF,stroke-width:1px
-    classDef res fill:#3A7CA5,stroke:#2F6690,color:#FFFFFF,stroke-width:1px
-    classDef net fill:#E8EEF4,stroke:#1F3A5F,color:#1F3A5F,stroke-width:1px
-    classDef ext fill:#FFFFFF,stroke:#6B7B8C,color:#33414E,stroke-width:1px
-    class DC01 ident
-    class CTX01 ctrl
-    class VDA res
-    class NAT net
-    class Internet ext
-    style Host fill:#F5F7FA,stroke:#1F3A5F,stroke-width:2px,color:#1F3A5F
-    style Identity fill:#FFFFFF,stroke:#1F3A5F,stroke-dasharray:4 3,color:#1F3A5F
-    style Control fill:#FFFFFF,stroke:#2F6690,stroke-dasharray:4 3,color:#1F3A5F
-    style Resource fill:#FFFFFF,stroke:#3A7CA5,stroke-dasharray:4 3,color:#1F3A5F
-    linkStyle default stroke:#6B7B8C,stroke-width:1.5px
-```
+| On-Prem Component | Azure Equivalent | Notes |
+|---|---|---|
+| Hyper-V Hypervisor | Azure Virtual Machines (IaaS) | Host VMs in Azure compute — B-series for dev/test, D-series for production |
+| DC01 — Active Directory | Azure Entra ID + AD DS on Azure VM | Hybrid identity: sync on-prem AD to Entra ID via Entra Connect |
+| CTX01 — Delivery Controller | Azure Virtual Desktop (AVD) Control Plane | AVD is a fully managed PaaS — no Delivery Controller VM needed in Azure |
+| CTX01 — StoreFront | AVD Web Client / Microsoft Workspace | Native browser-based access — no StoreFront infrastructure required |
+| CTX01 — Citrix Studio | Azure Portal + AVD Host Pool configuration | Host pools, application groups and workspaces replace Studio |
+| WIN11-VDA — Session Host | AVD Session Hosts (Windows 11 multi-session) | Azure Gallery image: Windows 11 Enterprise multi-session + M365 Apps |
+| Citrix Director | Azure Monitor + Log Analytics Workspace | Session telemetry, diagnostics and alerts via Azure Monitor |
+| DLP Clipboard Policy | Microsoft Purview DLP + Intune | Endpoint DLP policies enforced via Intune, data classification via Purview |
+| Hyper-V Checkpoints | Azure VM Snapshots + Recovery Services Vault | Automated backup policies and point-in-time restore |
+| Lab-Internal vSwitch | Azure Virtual Network (VNet) + NSG | Subnet isolation, NSGs replace physical switch ACLs |
+| SQL Server Express | Azure SQL Managed Instance / SQL Database | PaaS database — no SQL Server VM maintenance |
 
-The planned user flow: `citrixuser1` signs in to StoreFront on CTX01, the Delivery Controller authenticates the user against DC01 and checks membership of **Citrix Desktop Users**, then brokers a session to WIN11-VDA.
+**Architecture decisions for Azure migration:**
+
+- **Identity:** Hybrid Entra ID join — on-prem AD synced to Entra ID via Entra Connect. Conditional Access policies enforce MFA on all AVD logons
+- **Networking:** Hub-and-spoke VNet topology. AVD session hosts in a dedicated spoke VNet, peered to hub containing AD DS and shared services
+- **Security:** Microsoft Defender for Cloud enabled across all resources. Purview DLP replaces Citrix clipboard policy with richer classification-aware controls
+- **Monitoring:** Log Analytics Workspace ingests AVD diagnostics, Entra ID sign-in logs, and Defender alerts — feeding into a Microsoft Sentinel SIEM
+- **AI Governance (ISO 42001):** AI tools (Copilot for M365, ChatGPT Enterprise, Claude) delivered through AVD session hosts — prompts and outputs stay within the Azure tenant boundary, auditable via Purview Audit
 
 ---
 
-## 4. Key design decisions
+## 🤖 AI & Modern Relevance
 
-Each decision favours a realistic enterprise pattern while keeping the lab simple enough to run on one machine.
+Citrix CVAD is increasingly positioned as **secure AI delivery infrastructure**:
 
-| # | Decision | Alternatives considered | Rationale |
-| --- | --- | --- | --- |
-| D1 | Host capacity sized for the full lab: 64 GB RAM on an HP EliteBook 840 G11 | A 16 GB host extended with RAM and external storage upgrades | 16 GB could not run three VMs comfortably. 64 GB removes memory as a constraint and leaves room to grow |
-| D2 | Microsoft Hyper-V as the hypervisor | VMware Workstation | Built into Windows 11 Pro at no cost, fully scriptable in PowerShell, and a supported Citrix hypervisor |
-| D3 | Internal switch with NAT (LabNAT) | External switch bridged to the home network | Isolates the lab's DHCP and domain from the home network while keeping internet access |
-| D4 | Dedicated 192.168.100.0/24 subnet with a reserved addressing plan | Default Hyper-V switch | Predictable, documented addresses. Servers are static; desktops use a DHCP scope |
-| D5 | Separate VMs for identity, Citrix control and desktop | Collapse roles onto fewer VMs | Mirrors enterprise tiering and keeps faults and changes isolated per tier |
-| D6 | Single-server Citrix control tier on CTX01 | Split Delivery Controller, StoreFront and SQL | Enough for learning. Can be expanded to HA later |
-| D7 | OU design separating Users, Groups, Servers and VDAs | Default Users and Computers containers | Enables targeted Group Policy for servers versus desktops |
-| D8 | Group-based access through Citrix Desktop Users | Assigning individual users | Standard least-privilege practice. Access changes become group membership changes |
-| D9 | Windows Server 2022 Desktop Experience and Windows 11 Enterprise | Server Core, Windows 11 Pro | GUI suits learning. Enterprise is the edition corporate VDAs typically run |
-| D10 | Generation 2 VMs with vTPM on the desktop | Generation 1 | Required for Windows 11 and matches modern UEFI and Secure Boot builds |
-| D11 | Domain name lab.local | A subdomain of an owned public domain (e.g. ad.example.com) | Accepted trade-off for an isolated lab. Microsoft advises against .local because it conflicts with multicast DNS; a production design would use a subdomain of a registered domain |
+- **Secure AI Workstation Delivery** — AI tools (Copilot, ChatGPT Enterprise, Claude, internal LLMs) can be delivered as published applications through Citrix, keeping prompts and outputs inside a controlled environment rather than on employee laptops
+- **Data Boundary Enforcement** — DLP policies like the one built in this lab prevent AI-generated sensitive content from being copy-pasted out of virtual sessions to unmanaged devices
+- **Centralised Monitoring** — Director gives visibility into who accessed AI tools, session duration, and endpoint details — feeding into SIEM/audit pipelines
+- **Zero Trust for AI** — Combining Citrix with identity providers (Entra ID, Duo) ensures AI access is gated behind MFA and conditional access, not just VPN
+
+**Risk Consideration:** AI-assisted productivity tools introduced into a Citrix environment without DLP controls create a data exfiltration risk — users could paste sensitive company data into public AI services. The clipboard restriction policy in this lab directly mitigates that risk.
 
 ---
 
-## 5. Environment specification
+## 📋 Build Phases
 
-The lab uses about 20 GB of the host's 64 GB RAM, leaving headroom for additional servers.
-
-**Host**
-
-| Attribute | Value |
-| --- | --- |
-| Model | HP EliteBook 840 G11 |
-| CPU | Intel Core Ultra 7 155U (12 cores, 14 threads) |
-| Memory | 64 GB DDR5 |
-| Storage | 1 TB SSD (single M.2 slot) |
-| OS | Windows 11 Pro, Hyper-V role enabled |
-| Host name | LAB-HOST01 |
-
-**Virtual machines**
-
-| VM | Role | OS | vCPU | RAM (GB) | Disk (GB) | Generation |
-| --- | --- | --- | --- | --- | --- | --- |
-| DC01 | AD DS, DNS, DHCP | Windows Server 2022 Standard Eval (Desktop Experience) | 2 | 4 | 60 | 2 |
-| CTX01 | Citrix Delivery Controller, StoreFront, Studio, License Server | Windows Server 2022 Standard Eval (Desktop Experience) | 4 | 8 | 80 | 2 |
-| WIN11-VDA | Virtual desktop | Windows 11 Enterprise Eval 25H2 | 2 | 8 | 80 | 2 (vTPM) |
-
-**IP addressing**
-
-| Address | Assignment |
-| --- | --- |
-| 192.168.100.0/24 | Lab subnet |
-| 192.168.100.1 | Host vEthernet (LabNAT), default gateway |
-| 192.168.100.10 | DC01, static |
-| 192.168.100.20 | CTX01, static |
-| 192.168.100.100–150 | DHCP scope "Lab" for desktops (WIN11-VDA leased .100) |
-| DNS forwarders | 8.8.8.8, 1.1.1.1 |
-
-**Active Directory**
-
-| Object | Value |
-| --- | --- |
-| Forest and domain | lab.local (NetBIOS: LAB) |
-| OU=Lab | Parent OU |
-| OU=Users,OU=Lab | citrixuser1, citrixuser2 |
-| OU=Groups,OU=Lab | Citrix Desktop Users (Global security group) |
-| OU=Servers,OU=Lab | CTX01 |
-| OU=VDAs,OU=Lab | WIN11-VDA |
-| OU=Domain Controllers | DC01 |
+### ✅ Phase 1 — Hyper-V Host Preparation
+- Enabled Hyper-V role on Windows 11 host laptop
+- Created internal virtual switch (`Lab-Internal`) — isolated network for all lab VMs
+- Configured host IP: `192.168.100.1/24`
 
 ---
 
-## 6. Build implementation
-
-The build ran in six phases, each ending with a verification check. A Hyper-V checkpoint of all three VMs captures the completed foundation. Commands marked **Host** run in an elevated PowerShell on the laptop, and the others run inside the named VM.
-
-### Phase 1: Host platform (Host)
-
-```powershell
-Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V -All
-New-Item -ItemType Directory -Path C:\Lab\ISOs, C:\Lab\VMs -Force
-```
-
-Media staged in `C:\Lab\ISOs`: `SERVER_EVAL_x64FRE_en-us.iso` (Windows Server 2022) and `Win11_Ent_Eval.iso` (Windows 11 Enterprise 25H2).
-
-**Verified:** Hyper-V Manager opens and lists the host.
-
-### Phase 2: Isolated NAT network (Host)
-
-```powershell
-New-VMSwitch -Name "LabNAT" -SwitchType Internal
-New-NetIPAddress -IPAddress 192.168.100.1 -PrefixLength 24 -InterfaceAlias "vEthernet (LabNAT)"
-New-NetNat -Name "LabNAT" -InternalIPInterfaceAddressPrefix 192.168.100.0/24
-```
-
-**Verified:** `Get-NetNat` shows LabNAT, 192.168.100.0/24, Active: True.
-
-### Phase 3: DC01, the identity tier
-
-Create the VM (Host):
-
-```powershell
-New-VM -Name DC01 -Generation 2 -MemoryStartupBytes 4GB -Path C:\Lab\VMs -NewVHDPath C:\Lab\VMs\DC01\DC01.vhdx -NewVHDSizeBytes 60GB -SwitchName LabNAT
-Set-VMProcessor DC01 -Count 2
-Add-VMDvdDrive -VMName DC01 -Path "C:\Lab\ISOs\SERVER_EVAL_x64FRE_en-us.iso"
-Set-VMFirmware DC01 -FirstBootDevice (Get-VMDvdDrive DC01)
-```
-
-Install Windows Server 2022 Standard Evaluation (Desktop Experience), then configure it (DC01):
-
-```powershell
-New-NetIPAddress -InterfaceAlias Ethernet -IPAddress 192.168.100.10 -PrefixLength 24 -DefaultGateway 192.168.100.1
-Set-DnsClientServerAddress -InterfaceAlias Ethernet -ServerAddresses 127.0.0.1
-Rename-Computer -NewName DC01 -Restart
-Install-WindowsFeature AD-Domain-Services, DNS, DHCP -IncludeManagementTools
-Install-ADDSForest -DomainName lab.local -DomainNetbiosName LAB -InstallDns
-Add-DnsServerForwarder -IPAddress 8.8.8.8, 1.1.1.1
-Add-DhcpServerInDC -DnsName dc01.lab.local -IPAddress 192.168.100.10
-Add-DhcpServerv4Scope -Name Lab -StartRange 192.168.100.100 -EndRange 192.168.100.150 -SubnetMask 255.255.255.0
-Set-DhcpServerv4OptionValue -ScopeId 192.168.100.0 -Router 192.168.100.1 -DnsServer 192.168.100.10 -DnsDomain lab.local
-Restart-Service DHCPServer
-```
-
-**Verified:** `ping 8.8.8.8` gets replies, `Get-ADDomain` returns lab.local / LAB, `whoami` returns lab\administrator, `Resolve-DnsName google.com` resolves, and the Lab DHCP scope is Active.
-
-### Phase 4: CTX01, the Citrix control tier
-
-Create the VM (Host). It follows the same pattern as DC01, with 8 GB RAM, an 80 GB disk and 4 vCPU:
-
-```powershell
-New-VM -Name CTX01 -Generation 2 -MemoryStartupBytes 8GB -Path C:\Lab\VMs -NewVHDPath C:\Lab\VMs\CTX01\CTX01.vhdx -NewVHDSizeBytes 80GB -SwitchName LabNAT
-Set-VMProcessor CTX01 -Count 4
-```
-
-Configure it and join the domain (CTX01):
-
-```powershell
-New-NetIPAddress -InterfaceAlias Ethernet -IPAddress 192.168.100.20 -PrefixLength 24 -DefaultGateway 192.168.100.1
-Set-DnsClientServerAddress -InterfaceAlias Ethernet -ServerAddresses 192.168.100.10
-Add-Computer -DomainName lab.local -NewName CTX01 -Credential LAB\Administrator -Restart
-```
-
-**Verified:** `ping lab.local` resolves to 192.168.100.10, the computer's domain shows lab.local, and a domain sign-in returns lab\administrator.
-
-### Phase 5: WIN11-VDA, the resource tier
-
-Create the VM with a virtual TPM for Windows 11 (Host):
-
-```powershell
-New-VM -Name WIN11-VDA -Generation 2 -MemoryStartupBytes 8GB -Path C:\Lab\VMs -NewVHDPath C:\Lab\VMs\WIN11-VDA\WIN11-VDA.vhdx -NewVHDSizeBytes 80GB -SwitchName LabNAT
-Set-VMProcessor WIN11-VDA -Count 2
-Set-VMKeyProtector -VMName WIN11-VDA -NewLocalKeyProtector
-Enable-VMTPM -VMName WIN11-VDA
-Add-VMDvdDrive -VMName WIN11-VDA -Path C:\Lab\ISOs\Win11_Ent_Eval.iso
-Set-VMFirmware WIN11-VDA -FirstBootDevice (Get-VMDvdDrive WIN11-VDA)
-```
-
-Install Windows 11 Enterprise with a local account (**Sign-in options → Domain join instead**), then join the domain (WIN11-VDA):
-
-```powershell
-Add-Computer -DomainName lab.local -NewName WIN11-VDA -Credential LAB\Administrator -Restart
-```
-
-**Verified:** `ipconfig /all` shows a DHCP lease of 192.168.100.100 from DC01 with the lab.local suffix, and `whoami` returns lab\administrator.
-
-### Phase 6: Directory structure and access (DC01)
-
-```powershell
-New-ADOrganizationalUnit -Name Lab
-"Users","Groups","Servers","VDAs" | ForEach-Object { New-ADOrganizationalUnit -Name $_ -Path "OU=Lab,DC=lab,DC=local" }
-$pw = Read-Host "Enter password" -AsSecureString
-1..2 | ForEach-Object { New-ADUser -Name "citrixuser$_" -UserPrincipalName "citrixuser$_@lab.local" -Path "OU=Users,OU=Lab,DC=lab,DC=local" -AccountPassword $pw -Enabled $true }
-New-ADGroup -Name "Citrix Desktop Users" -GroupScope Global -Path "OU=Groups,OU=Lab,DC=lab,DC=local"
-Add-ADGroupMember "Citrix Desktop Users" -Members citrixuser1, citrixuser2
-Get-ADComputer CTX01 | Move-ADObject -TargetPath "OU=Servers,OU=Lab,DC=lab,DC=local"
-Get-ADComputer WIN11-VDA | Move-ADObject -TargetPath "OU=VDAs,OU=Lab,DC=lab,DC=local"
-```
-
-**Verified:** all five OUs exist, both users are Enabled, the group has two members, and each computer sits in its OU.
-
-### Checkpoints (Host)
-
-```powershell
-Get-VM | Checkpoint-VM -SnapshotName "Lab foundation complete"
-```
+### ✅ Phase 2 — Domain Controller (DC01)
+- Deployed Windows Server 2022 VM (DC01)
+- Installed AD DS, DNS, DHCP roles
+- Promoted to domain controller: `lab.local`
+- Created lab users: `citrixuser1`, `citrixuser2`
+- Created security group: `Citrix-Desktop-Users`
 
 ---
 
-## 7. Issues encountered and resolutions
-
-Nine issues came up during the build, and none required rebuilding a VM. Each was diagnosed from the error text and fixed in place.
-
-| # | Issue | Root cause | Resolution |
-| --- | --- | --- | --- |
-| 1 | `New-NetNat` failed with Windows System Error 52 (duplicate name) | The LabNAT NAT object already existed from an earlier run | Confirmed with `Get-NetNat` that it was correct and Active. No change needed |
-| 2 | VM boot summary: "SCSI DVD – The boot loader failed" | The "Press any key to boot from CD or DVD" prompt timed out | Reset the VM and pressed a key immediately |
-| 3 | Restart button unresponsive on the boot summary screen | VMConnect focus | Used Action → Reset, or `Stop-VM -TurnOff` then `Start-VM` |
-| 4 | Pasted commands merged, e.g. `Get-NetAdapterNew-NetIPAddress` | Clipboard paste appended to the previous line | Cleared the line and re-entered the command on its own |
-| 5 | Long commands truncated inside VMConnect | Likely paste-length limits in the VM console (not confirmed) | Typed commands by hand and dropped unnecessary quotes |
-| 6 | `vmconnect` not recognised | Run inside DC01 instead of on the host | Ran Hyper-V cmdlets in the host's elevated PowerShell only |
-| 7 | Rename-Item could not find the Windows 11 ISO | Tab completion not used on a very long filename | Used a wildcard: `Get-ChildItem C:\Lab\ISOs\26200*.iso \| Rename-Item -NewName Win11_Ent_Eval.iso` |
-| 8 | `New-ADUser` rejected the password, leaving both users created but disabled | Password did not meet domain complexity policy | Reset with `Set-ADAccountPassword -Reset` and `Enable-ADAccount` |
-| 9 | CTX01 signed in as ctx01\administrator after the domain join | The local account is the default at the sign-in screen | Signed in via Other user as LAB\Administrator |
-
-A tenth blocker is still open: the Citrix installation media. Citrix no longer offers self-service account creation for trials, so an account must be provisioned through Citrix sales or a partner.
+### ✅ Phase 3 — CTX01 Component Installation
+- Deployed Windows Server 2022 VM (CTX01)
+- Joined domain: `LAB\CTX01`
+- Mounted CVAD 2203 LTSR ISO
+- Installed all Citrix components onto CTX01: Delivery Controller, Studio, StoreFront, Director
+> Configuration of each component follows in Phases 7–10
 
 ---
 
-## 8. Security and governance considerations
-
-The lab applies baseline controls now and flags the hardening a production build would need.
-
-**Controls in place**
-
-- **Network isolation:** the lab runs on an internal switch behind NAT, so its DHCP and domain services never reach the home network.
-- **Least privilege by group:** desktop access will be granted through the Citrix Desktop Users security group, not to individual accounts.
-- **Structured directory:** separate OUs for servers and desktops allow distinct Group Policy baselines.
-- **Password policy:** the default domain complexity policy is enforced. It rejected a weak password during the build, as intended.
-- **Secure Boot and vTPM:** Generation 2 VMs with UEFI Secure Boot, and a virtual TPM on the Windows 11 desktop.
-- **Recoverability:** a Hyper-V checkpoint of all three VMs at the end of the foundation build allows rollback in seconds.
-
-**Gaps a production design would close**
-
-- **Privileged access:** the built-in Administrator is used everywhere. Production would use named admin accounts, tiered administration and a separate Citrix admin group.
-- **Service accounts:** none yet. Citrix and SQL would run under dedicated or group Managed Service Accounts.
-- **Resilience:** there is a single domain controller and a single Citrix controller, so each is a single point of failure.
-- **TLS:** StoreFront will need a certificate (from an internal CA) rather than HTTP.
-- **Monitoring and logging:** no central log collection or Citrix Director monitoring yet.
-- **Backup:** checkpoints are not backups. Production needs system-state backups of the domain controllers.
-
-These gaps also map to ISO/IEC 27001 Annex A areas such as access control, logging and monitoring, and backup, which makes the lab useful for demonstrating control design as well as technical build.
+### ✅ Phase 4 — SQL Database & Site Configuration
+- Installed Microsoft SQL Server (Express) on CTX01
+- Created Citrix Site database: `CitrixSite`
+- Configured Site using Citrix Studio wizard
+- Verified database connectivity and site health
 
 ---
 
-## 9. Current status and roadmap
-
-The foundation (phases 1 to 6) is complete, and the Citrix phases start as soon as the installation media is available.
-
-| Phase | Scope | Dependency | Status |
-| --- | --- | --- | --- |
-| 1–6 | Host, network, DC01, CTX01, WIN11-VDA, AD structure | None | Complete |
-| 7 | Install the Delivery Controller, Studio, StoreFront and License Server on CTX01 | Citrix CVAD ISO (LTSR) | Blocked: awaiting Citrix account |
-| 8 | Install the VDA on WIN11-VDA and register it with CTX01 | Phase 7 | Not started |
-| 9 | Create a machine catalog and a delivery group assigned to Citrix Desktop Users | Phase 8 | Not started |
-| 10 | End-user test: citrixuser1 signs in through StoreFront and launches the desktop | Phase 9 | Not started |
-| 11 | Extensions: server VDA for published apps, second controller, TLS, Group Policy baselines, Citrix Director | Phase 10 | Planned |
-
-**Open action**
-
-- [ ] Request a Citrix trial account through Citrix sales or a UK Citrix partner, then download the Citrix Virtual Apps and Desktops LTSR ISO to `C:\Lab\ISOs`.
-
-**Licensing clock:** Citrix trial mode runs for 30 days, so plan phases 7 to 10 into a focused block once the media arrives. Windows Server evaluation lasts 180 days and Windows 11 Enterprise evaluation 90 days.
+### ✅ Phase 5 — Windows 11 VDA (WIN11-VDA)
+- Deployed Windows 11 VM (WIN11-VDA)
+- Joined domain: `LAB\WIN11-VDA`
+- Installed Citrix Virtual Delivery Agent (VDA) — Desktop OS
+- VDA registered successfully with CTX01 Delivery Controller
 
 ---
 
-## 10. Skills demonstrated and lessons learned
-
-The project shows end-to-end infrastructure design and delivery, from capacity planning through to a documented, verified build.
-
-**Skills demonstrated**
-
-- **Capacity planning:** sized three VMs against host RAM and chose to replace the host rather than upgrade an undersized one.
-- **Virtualisation:** Hyper-V switching, NAT, Generation 2 VMs, vTPM and checkpoints, all scripted in PowerShell.
-- **Network design:** subnetting, a static-versus-DHCP addressing plan, gateway and DNS forwarding.
-- **Identity services:** building an AD DS forest, integrated DNS, authorised DHCP, domain joins, OU design and group-based access.
-- **Troubleshooting:** diagnosed nine issues from error output and fixed each without a rebuild.
-- **Documentation:** architecture, design decisions, configuration and verification recorded as the build progressed.
-
-**Lessons learned**
-
-- Know which shell you're in: host cmdlets such as `New-VM` and `vmconnect` fail inside a guest, and guest network commands would reconfigure the host.
-- Read errors before retrying. A "duplicate name" error on NAT meant the work was already done.
-- A failed `New-ADUser` password can leave a disabled account behind, so always verify rather than assume.
-- Point member servers' DNS at the domain controller, not a public resolver, or domain joins fail.
-- Check vendor licensing and media access early. It became the critical-path dependency for this project.
+### ✅ Phase 6 — Machine Catalog & Delivery Group
+- Created Machine Catalog: **`Lab-W11-Desktop`**
+  - Type: Static (single user), existing image
+  - Added WIN11-VDA to catalog
+- Created Delivery Group: **`Lab-Desktop-Users`**
+  - Assigned Machine Catalog
+  - Added `LAB\Citrix-Desktop-Users` as allowed users (AD security group created in Phase 2)
+  - Desktop entitlement: Windows 11 desktop
+  > Note: `Citrix-Desktop-Users` is the Active Directory group controlling identity; `Lab-Desktop-Users` is the Citrix Delivery Group controlling entitlement — two separate objects by design.
 
 ---
 
-## 11. Security and AI governance framing
+### ✅ Phase 7 — StoreFront Configuration
 
-This is an access-control project delivered as infrastructure. Virtual desktop infrastructure exists to put a controlled boundary between a user and the data they work with, so every design decision here is a security decision.
+**Challenge Encountered:** Initial store creation accidentally enabled "Allow only unauthenticated users" — resulting in a blank store with no desktops visible.
 
-**The security case**
+**Fix:** Deleted the store, recreated it correctly with authentication enabled.
 
-- **Identity as the control plane:** access is granted through a security group, so entitlement reviews become group membership reviews rather than per-machine checks.
-- **Segmentation:** the lab runs on an isolated NAT network, demonstrating how a virtual desktop estate is kept off the corporate flat network.
-- **Tiered administration:** separate OUs for servers and desktops are the foundation for distinct policy baselines and administrative scoping.
-- **Hardware root of trust:** Secure Boot and virtual TPM on the desktop tier support disk encryption and measured boot.
-- **Control assessment, not just build:** section 8 states both the controls implemented and the gaps a production design would close, which is the assessment a consultant is engaged to produce.
+**StoreFront Setup:**
+- Store Name: `LabStore`
+- Virtual Path: `/Citrix/LabStore`
+- Delivery Controller: `CTX01.lab.local`
+- Authentication Methods: Username & Password (Active Directory)
+- Web Receiver: Enabled with **"Always use Receiver for HTML5"** setting
 
-**ISO/IEC 27001:2022 Annex A mapping**
-
-| Annex A control | Where it appears in this build |
-| --- | --- |
-| A.5.15 Access control | Citrix Desktop Users group governs desktop entitlement |
-| A.5.16 Identity management | User and computer identities provisioned into a structured OU hierarchy |
-| A.5.18 Access rights | Group-based assignment, reviewable and revocable in one place |
-| A.8.2 Privileged access rights | Gap identified: shared built-in Administrator, with named admin accounts and tiering as the remediation |
-| A.8.9 Configuration management | Post-install configuration scripted in PowerShell and documented with verification steps |
-| A.8.13 Information backup | Gap identified: checkpoints are not backups, so system-state backup is required |
-| A.8.15 Logging | Gap identified: no central log collection or session monitoring |
-| A.8.16 Monitoring activities | Planned: Citrix Director for session and performance monitoring |
-| A.8.20 Networks security | Isolated internal switch behind NAT |
-| A.8.22 Segregation of networks | Lab subnet segregated from the host network |
-| A.8.24 Use of cryptography | Gap identified: StoreFront requires TLS from an internal certificate authority |
-
-**Extension: governed access to GenAI tools (ISO/IEC 42001)**
-
-The natural next phase publishes a GenAI application as a Citrix-delivered resource rather than installing it on endpoints. That pattern addresses a live enterprise problem: staff using AI tools outside any control boundary.
-
-Delivering AI tools this way provides:
-
-- **Entitlement control:** access granted to an approved group, with joiners and leavers handled through existing identity processes.
-- **Data boundary:** the session runs in the data centre, so corporate data need not leave the controlled environment and clipboard, drive-mapping and print redirection can be restricted by policy.
-- **Auditability:** session recording and logging give evidence of who used which AI tool and when.
-- **Change control:** the tool version is managed in the master image rather than on individual devices.
-
-This supports ISO/IEC 42001 Clause 8 (Operation) and Clause 9.1 (Monitoring, measurement, analysis and evaluation), together with the Annex A control areas for use of AI systems (A.9) and third-party relationships (A.10), and it turns the lab from a virtualisation exercise into a demonstrable AI governance capability.
+> **Note on HTML5 mode:** Citrix Workspace App 26.x blocks HTTP (non-SSL) store connections by default. Switching to HTML5 Receiver bypasses the native app entirely — users authenticate and launch desktops through the browser without needing the Workspace App installed. This is ideal for lab environments without SSL certificates.
 
 ---
 
-## 12. Cloud migration path: Microsoft Azure
+### ✅ Phase 8 — Citrix Studio Installation & Verification
 
-This lab is deliberately built on-premises on Hyper-V. The value of the design is that its identity and access model is platform-independent: the same structure carries into Azure, and only the hosting layer changes. This section sets out how each component would translate.
+> 📹 **Video walkthrough available** — see Phase 3 in the Video Walkthroughs section below.
 
-**Component mapping**
+**What was verified in Studio:**
+- Site database: Connected and healthy
+- Delivery Controller: Online and registered
+- Machine Catalog: `Lab-W11-Desktop` — 1 machine, 0 unregistered
+- Delivery Group: `Lab-Desktop-Users` — Desktop available
+- VDA Registration: WIN11-VDA registered (Green)
 
-| Lab component | Azure equivalent | Design note |
-| --- | --- | --- |
-| DC01 (AD DS, DNS) | Domain controllers on Azure VMs, or Microsoft Entra Domain Services | Citrix VDAs still need a traditional AD domain to join; Entra ID is synchronised via Entra Connect for cloud sign-in |
-| DC01 (DHCP) | Azure-native IP addressing | Azure VNets assign addresses themselves, so DHCP is retired rather than migrated |
-| CTX01 (Delivery Controller, Studio, Licensing) | Citrix DaaS control plane | The control tier becomes a Citrix-managed service; Cloud Connectors on Azure VMs link it to the domain |
-| CTX01 (StoreFront) | Citrix Workspace, or StoreFront on an Azure VM | Workspace removes a server to patch; self-hosted StoreFront keeps more control |
-| WIN11-VDA | Citrix VDAs on Azure VMs, or Azure Virtual Desktop session hosts | Windows 11 multi-session is available on Azure, improving density versus one user per VM |
-| LabNAT internal switch | Azure Virtual Network with subnets and Network Security Groups | Separate subnets for identity, control and desktop tiers, with NSGs enforcing traffic between them |
-| NAT to the internet | Azure NAT Gateway or Azure Firewall | Firewall adds outbound filtering and logging, supporting the monitoring gaps in section 8 |
-| Hyper-V checkpoints | Azure Backup and image versioning via Azure Compute Gallery | Closes the backup gap identified against A.8.13 |
-
-**What carries over unchanged**
-
-- The OU structure separating servers, desktops, users and groups.
-- Group-based entitlement through Citrix Desktop Users.
-- The three-tier separation of identity, control and workload.
-- The security gaps and remediations identified in sections 8 and 11.
-
-**What improves in Azure**
-
-- **Conditional Access and MFA** through Entra ID, closing the authentication gap without extra infrastructure.
-- **Central logging** through Azure Monitor and Microsoft Sentinel.
-- **Elastic capacity**, with desktops scaled by schedule or demand rather than fixed hardware.
-
-**Scope note**
-
-This section maps the design, not a deployed build. The lab validates the identity and access design hands-on; an Azure deployment of the same design is a candidate future phase.
 ---
 
-## 13. Phase 6b–6e: SQL, SSMS, Workspace App and CTX01 Pre-flight
+### ✅ Phase 9 — End-to-End Session Test
 
-### Phase 6b: SQL Server 2025 Developer Edition (CTX01)
+> 📹 **Video walkthrough available** — see Phase 9 in the Video Walkthroughs section below.
 
-SQL Server 2025 Standard Developer Edition installed on CTX01 to provide the
-Site database required by the Citrix Delivery Controller. Developer edition
-chosen over Express — no database size limit and full SQL engine feature set,
-free for non-production use.
+**Test scenario:** Log in as `citrixuser1` via browser, launch Windows 11 virtual desktop, verify session is active.
 
-| Attribute | Value |
+**Steps performed:**
+1. Opened StoreFront URL: `http://192.168.100.20/Citrix/LabStoreWeb`
+2. Logged in as `LAB\citrixuser1`
+3. Desktop enumeration: Windows 11 desktop appeared in store
+4. Launched desktop — Citrix HTML5 Receiver opened the session
+5. Session confirmed active in Citrix Director
+
+**Result: ✅ End-to-end desktop delivery working**
+
+**Troubleshooting encountered and resolved:**
+- StoreFront store initially created with anonymous access enabled (unauthenticated) → deleted and recreated with AD authentication → desktops became visible
+- Citrix Workspace App 26.x blocked HTTP store connection → switched StoreFront to HTML5 Receiver mode → browser-based login worked without Workspace App
+- Desktop session failed to launch → WIN11-VDA VM was powered off → powered on → session launched successfully
+
+---
+
+### ✅ Phase 10 — Citrix Director Installation & Configuration
+
+Citrix Director is the web-based monitoring and helpdesk console for CVAD.
+
+**Installation:**
+- Mounted CVAD ISO on CTX01
+- Ran autoplay → "Extend Deployment" → Selected **Director**
+- Accepted prerequisite installation (IIS, ASP.NET, .NET Framework)
+- Completed installation — IIS site created at `/Director`
+
+**Restart required:** CTX01 rebooted after Director installation.
+
+**Sign-in:** `http://192.168.100.20/Director`
+- Credentials: `LAB\Administrator` (domain admin)
+- Site connected automatically (same server as Delivery Controller)
+
+**Director capabilities verified:**
+- Active session monitoring (Session Details, Client IP, Protocol)
+- User activity history
+- Machine status dashboard
+- Session shadowing (requires Windows Remote Assistance on VDA)
+- Alert policies and notifications
+
+---
+
+### ✅ Phase 11 — DLP Security Policy: Clipboard Restriction
+
+> 📹 **Video walkthrough available** — see Phase 11 in the Video Walkthroughs section below.
+
+**Policy Name:** `DLP-Clipboard-Restriction`  
+**Compliance Alignment:** ISO 27001 Control 8.12 — Data Leakage Prevention  
+**AI Relevance:** Prevents users from copy-pasting sensitive data to/from virtual sessions — critical when AI tools are delivered through Citrix
+
+**Policy Configuration (Citrix Studio → Policies):**
+
+| Setting | Value |
 |---|---|
-| Edition | SQL Server 2025 Standard Developer |
-| Version | 17.0.1000.7 RTM |
-| Instance name | MSSQLSERVER (default instance) |
-| SQL administrator | LAB\Administrator |
-| Install path | C:\Program Files\Microsoft SQL Server |
+| Policy Name | DLP-Clipboard-Restriction |
+| Description | Restricts clipboard transfer between virtual session and client device — ISO 27001 Control 8.12 |
+| Client Clipboard Redirection | Prohibited |
+| Assignment | Delivery Group: Lab-Desktop-Users |
+| Priority | 1 (highest) |
 
-```powershell
-Start-Service -Name 'MSSQLSERVER'
-Set-Service -Name 'MSSQLSERVER' -StartupType Automatic
-Get-Service -Name 'MSSQLSERVER'
-```
-
-**Citrix wizard database server value:** `CTX01`
-
-**Verified:** `Get-Service -Name 'MSSQLSERVER'` returns Status: Running.
+**What this policy does:**
+- Blocks copy/paste between the virtual desktop and the user's local device
+- Data typed or created inside the Citrix session cannot be exfiltrated via clipboard to an unmanaged endpoint
+- Works bidirectionally — also blocks pasting local content into the virtual session (e.g. pasting credentials from a local password manager into a server session)
 
 ---
 
-### Phase 6c: SQL Server Management Studio 22 (CTX01)
+### ✅ Phase 12 — Hyper-V Checkpoints (Lab Snapshots)
 
-SSMS 22.10.1 installed on CTX01 to verify Citrix site databases post-build.
-No optional workloads selected during installation.
+Checkpoints taken after full lab completion to preserve working state:
 
-**Verified:** SSMS opens and connects to CTX01 using Windows Authentication.
+```powershell
+# Run as Administrator on Hyper-V host
+Checkpoint-VM -Name CTX01 -SnapshotName "StoreFront + Director + DLP Policy configured"
+Checkpoint-VM -Name DC01  -SnapshotName "Lab complete - DC01 fully configured"
+Checkpoint-VM -Name WIN11-VDA -SnapshotName "Lab complete - VDA registered and working"
+```
 
 ---
 
-### Phase 6d: Citrix Workspace App (Host laptop)
+## ⚠️ Lab Scope & Known Limitations
 
-Citrix Workspace App 26.3.10.69 x64 installed on host laptop — the client
-used in Phase 10 to connect to StoreFront and launch the virtual desktop.
+This is a home lab, not a production deployment. The following gaps are acknowledged and intentional given the single-laptop, isolated environment:
 
-| Attribute | Value |
-|---|---|
-| Version | 26.3.10.69 |
-| Platform | Windows x64 |
-| Installed on | LAB-HOST01 (host laptop) |
+| Limitation | Production Equivalent | Planned |
+|---|---|---|
+| No SSL/TLS — HTTP only | SSL certificate + HTTPS on all services | Phase 13 (with NetScaler) |
+| No Citrix Gateway / NetScaler | NetScaler ADC for external access and MFA | Phase 13 |
+| No MFA | Duo, Entra ID SAML, or RADIUS MFA at StoreFront | Phase 13 |
+| SQL Server Express | Full SQL Server with AlwaysOn AG | Out of scope for lab |
+| Single Delivery Controller | Minimum two for HA in production | Out of scope for lab |
+| Single VDA | Machine catalog with multiple session hosts | Future phase |
+| No logging pipeline | Windows Event forwarding to SIEM | Future phase |
+| Shared Administrator account | Privileged Access Workstation (PAW) model | Out of scope for lab |
+| No MCS / PVS | Machine Creation Services for image-based VDA provisioning | Future phase |
+
+> Acknowledging these gaps is part of good architecture practice. Each limitation has a documented production equivalent and a clear path forward.
 
 ---
 
-### Phase 6e: CTX01 Pre-flight Preparation
+## 🔐 Security Posture Summary
 
-CTX01 is fully prepared for the Citrix CVAD installer:
+| Control | Implementation | Standard |
+|---|---|---|
+| Authentication | Active Directory username/password | ISO 27001 §8.5 (MFA planned — Phase 13) |
+| Session Isolation | Virtual desktop — no local data | Zero Trust principle |
+| Clipboard DLP | Citrix Policy — Client Clipboard Redirection: Prohibited | ISO 27001 §8.12 |
+| Audit Trail | Citrix Director — session logs | ISO 27001 §8.15 |
+| Snapshot Recovery | Hyper-V checkpoints at each major phase | Business Continuity |
 
-```powershell
-# .NET Framework 3.5 (required by Citrix installer)
-Install-WindowsFeature Net-Framework-Core
+---
 
-# Disable Windows Firewall (lab only)
-Set-NetFirewallProfile -Profile Domain, Public, Private -Enabled False
+## 🛠️ Tech Stack
 
-# Disable IE Enhanced Security
-$AdminKey = "HKLM:\SOFTWARE\Microsoft\Active Setup\Installed Components\{A509B1A7-37EF-4b3f-8CFC-4F3A74704073}"
-Set-ItemProperty -Path $AdminKey -Name "IsInstalled" -Value 0
+- **Hypervisor:** Microsoft Hyper-V (Windows 11 host)
+- **Guest OS:** Windows Server 2022 (DC01, CTX01), Windows 11 (WIN11-VDA)
+- **Citrix Version:** CVAD 7 2203 LTSR
+- **Components:** Delivery Controller, Studio, StoreFront, Director, VDA
+- **Database:** Microsoft SQL Server Express
+- **Identity:** Active Directory (lab.local)
+- **Networking:** Internal Hyper-V switch — 192.168.100.0/24
+
+---
+
+## 📁 Repository Structure
+
+```
+citrix-home-lab/
+└── README.md              ← This file (full build documentation)
 ```
 
-### Checkpoints (Host)
+> Screenshots and video evidence are being added progressively. The README is the primary documentation artefact.
 
-```powershell
-Checkpoint-VM -Name CTX01 -SnapshotName "SQL Server 2025 and SSMS 22 installed"
-Checkpoint-VM -Name DC01 -SnapshotName "Foundation complete"
-Checkpoint-VM -Name WIN11-VDA -SnapshotName "Foundation complete"
-```
+---
 
-**Verified:** All three VMs were checkpointed successfully.
+## 📹 Video Walkthroughs
+
+Screen recordings of each major phase — hosted directly on GitHub.
+
+| Phase | Description | Status |
+|---|---|---|
+| Phase 3 | Citrix Studio Installation | 🔜 Link coming |
+| Phase 7 | StoreFront — Logon Test | 🔜 Link coming |
+| Phase 9 | End-to-End Session Test | ✅ Available |
+| Phase 10 | Setting Up Citrix Director | 🔜 Link coming |
+| Phase 11 | DLP Clipboard Restriction Policy | ✅ Available |
+
+> 🎬 Videos for Phase 9 and Phase 11 are ready — links will be added once uploaded to GitHub. Remaining recordings being added progressively.
+
+---
+
+## 👤 Author
+
+**Olufemi Joshua Ajala**
+
+**Certifications:**
+- 🏆 Microsoft Certified: Azure Solutions Architect Expert (AZ-305)
+- 🔐 CISM — Certified Information Security Manager (ISACA)
+- 📋 ISO 27001 Lead Implementer
+- 🤖 ISO 42001 Lead Implementer (AI Management Systems)
+- 🏅 Computing Top 100 IT Leader 2026
+
+**Background:**  
+Cybersecurity and AI governance professional with hands-on expertise across Citrix virtual desktop infrastructure, Microsoft Azure architecture, and enterprise security frameworks. This lab covers the full CVAD stack end-to-end — security policy enforcement, compliance alignment to ISO 27001 and ISO 42001, and a migration design mapping every component to its Azure equivalent.
+
+**Areas of expertise:** Citrix CVAD · Azure Virtual Desktop (AVD) · Microsoft Entra ID · ISO 27001 · ISO 42001 · AI Governance · Data Loss Prevention · Zero Trust Architecture
+
+🔗 [LinkedIn](https://www.linkedin.com/in/olufemi-joshua-ajala/)
+
+---
+
+*Lab built on: Hyper-V | Citrix CVAD 2203 LTSR | Windows Server 2022 | Windows 11 | Designed for Azure migration*
