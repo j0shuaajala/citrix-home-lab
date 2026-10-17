@@ -4,6 +4,12 @@
 
 ---
 
+![Nation-state actors don't wait](threat-briefing.png)
+
+> *Nation-state actors don't wait for the board to sign off. This lab demonstrates how a security-first Citrix architecture — with DLP enforcement, session monitoring, and ISO 27001 alignment — addresses the threats that keep your CEO, CISO, and CTO up at night.*
+
+---
+
 ## 🏗️ Lab Architecture
 
 | Component | VM Name | IP Address | Role |
@@ -14,6 +20,17 @@
 | Host Machine | — | 192.168.100.1 | Hyper-V hypervisor (laptop) |
 
 **Domain:** `lab.local` | **NetBIOS:** `LAB`
+
+---
+
+## 🗺️ Architecture Diagram
+
+The diagram below shows the full lab topology — three VMs on a Hyper-V internal vSwitch, the end-to-end session delivery flow (HTTP logon → AD auth → ICA session), DLP policy enforcement, and the cloud migration mapping to Azure equivalents.
+
+![Citrix CVAD Home Lab — Architecture Diagram](citrix-lab-architecture.svg)
+
+> **Session flow:** `citrixuser1` (browser) → StoreFront (CTX01) → AD authentication (DC01 / LDAP) → ICA session (WIN11-VDA) — clipboard DLP policy enforced throughout via `DLP-Clipboard-Restriction`.  
+> **Right panel:** Every on-premises component mapped to its Azure equivalent — Entra ID, AVD, Purview DLP, Azure Monitor / Sentinel, and an ISO 42001 AI governance design.
 
 ---
 
@@ -295,7 +312,9 @@ This is a home lab, not a production deployment. The following gaps are acknowle
 
 ```
 citrix-home-lab/
-└── README.md              ← This file (full build documentation)
+├── README.md                        ← This file (full build documentation)
+├── citrix-lab-architecture.svg      ← Architecture diagram (inline in README)
+└── threat-briefing.png              ← Opening threat narrative image
 ```
 
 > Screenshots and video evidence are being added progressively. The README is the primary documentation artefact.
@@ -320,7 +339,7 @@ Screen recordings of each major phase — hosted directly on GitHub.
 
 ## 👤 Author
 
-**Olufemi Joshua Ajala**
+**Joshua Ajala**
 
 **Certifications:**
 - 🏆 Microsoft Certified: Azure Solutions Architect Expert (AZ-305)
