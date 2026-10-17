@@ -327,9 +327,9 @@ Screen recordings of each major phase — hosted directly on GitHub.
 
 | Phase | Description | Status |
 |---|---|---|
-| Phase 3 | Citrix Studio Installation | 🔜 Link coming |
-| Phase 7 | StoreFront — Logon Test | 🔜 Link coming |
-| Phase 9 | End-to-End Session Test | ✅ Available |
+| Phase 3 | Citrix Studio Installation | [▶ Watch](https://github.com/user-attachments/assets/ca77dfda-7692-4404-af22-60f000d09360) |
+| Phase 7 | StoreFront Configuration  | [▶ Watch](https://github.com/user-attachments/assets/ca77dfda-7692-4404-af22-60f000d09360) |
+| Phase 9 | End-to-End Session Test | [▶ Watch](https://github.com/user-attachments/assets/9f44a70f-1ff9-45fd-9ff8-4987cf3b6942) |
 | Phase 10 | Setting Up Citrix Director | 🔜 Link coming |
 | Phase 11 | DLP Clipboard Restriction Policy | ✅ Available |
 
