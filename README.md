@@ -1,12 +1,12 @@
 # Citrix Virtual Apps & Desktops (CVAD) Home Lab: Architecture and Build Guide
 
-> **A hands-on Citrix CVAD 7 2203 LTSR home lab built on Hyper-V — documenting every phase from bare-metal setup to security policy enforcement, compliance alignment, and a cloud migration design mapping the full deployment to Microsoft Azure Virtual Desktop.**
+> **A hands-on Citrix CVAD 7 2203 LTSR home lab built on Hyper-V, documenting every phase from bare-metal setup to security policy enforcement, compliance alignment, and a cloud migration design mapping the full deployment to Microsoft Azure Virtual Desktop.**
 
 ---
 
 ![Nation-state actors don't wait](threat-briefing.png)
 
-> *Nation-state actors don't wait for the board to sign off. This lab demonstrates how a security-first Citrix architecture — with DLP enforcement, session monitoring, and ISO 27001 alignment — addresses the threats that keep your CEO, CISO, and CTO up at night.*
+> *Nation-state actors don't wait for the board to sign off. This lab demonstrates how a security-first Citrix architecture — with DLP enforcement, session monitoring, and ISO 27001 alignment, addresses the threats that keep your CEO, CISO, and CTO up at night.*
 
 ---
 
@@ -25,7 +25,7 @@
 
 ## 🗺️ Architecture Diagram
 
-The diagram below shows the full lab topology — three VMs on a Hyper-V internal vSwitch, the end-to-end session delivery flow (HTTP logon → AD auth → ICA session), DLP policy enforcement, and the cloud migration mapping to Azure equivalents.
+The diagram below shows the full lab topology, three VMs on a Hyper-V internal vSwitch, the end-to-end session delivery flow (HTTP logon → AD auth → ICA session), DLP policy enforcement, and the cloud migration mapping to Azure equivalents.
 
 ![Citrix CVAD Home Lab — Architecture Diagram](citrix-lab-architecture.svg)
 
